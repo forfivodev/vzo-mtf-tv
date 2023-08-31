@@ -1,0 +1,59 @@
+//@version=5
+// © GM 2023
+
+indicator("VZO MTF", shorttitle="VZO MTF")
+tf                  = input.string("5", "Timeframe", ["1", "5", "10", "15", "30", "60", "120", "240", "D", "2D", "W", "M", "3M"])
+inpPeriod           = input(10, title="MA Length")
+inpFlLookBack       = input(10, "Floating levels look back period")
+inpFlLevelUp        = input(85, "Floating levels up level %")
+inpFlLevelDown      = input(15, "Floating levels down level %")
+vzo_color           = input(color.new(#5d606b, 30), "VZO color")
+cloud_color         = input(color.new(#3d4048, 70), "Cloud color")
+
+ticker = syminfo.tickerid
+
+//  FUNCTIONS
+f_security(_symbom, _resolution, _source) =>
+    request.security(_symbom, _resolution, _source[barstate.isrealtime ? 1 : 0], barmerge.gaps_off, lookahead=barmerge.lookahead_off)[barstate.isrealtime ? 0 : 1]
+
+float alpha = 2.0 / (1.0 + inpPeriod) 
+var float[] array_vzo = array.new_float()
+_sign = request.security(ticker, tf, math.sign(close - close[1]))
+_volume = request.security(ticker, tf, volume)
+_r = _sign * _volume
+_dvma = request.security(ticker, tf, ta.ema(_r, inpPeriod))
+_vma = request.security(ticker, tf, ta.ema(_volume, inpPeriod))
+vzo = _vma != 0 ? 100 * _dvma / _vma : 0
+
+_max = request.security(ticker, tf, ta.highest(vzo, inpFlLookBack))
+_min = request.security(ticker, tf, ta.lowest(vzo, inpFlLookBack))
+range_lookback = _max - _min
+level_up = _min + inpFlLevelUp * range_lookback / 100
+level_down = _min + inpFlLevelDown * range_lookback / 100
+
+hline(80, color=color.rgb(255, 0, 0), linewidth = 1, linestyle = hline.style_dotted)
+hline(60, color=color.rgb(255, 0, 0), linewidth = 1, linestyle = hline.style_dotted)
+hline(40, color=color.yellow, linewidth = 1, linestyle = hline.style_dotted)
+
+hline(-40, color=color.yellow, linewidth = 1, linestyle = hline.style_dotted)
+hline(-60, color=color.rgb(0, 255, 34), linewidth = 1, linestyle = hline.style_dotted)
+hline(-80, color=color.rgb(0, 255, 34), linewidth = 1, linestyle = hline.style_dotted)
+
+p1 = plot(level_up, color=cloud_color, linewidth=1)
+p2 = plot(level_down, color=cloud_color, linewidth=1)
+
+
+cloud_color := color.from_gradient(range_lookback, 100, 150, color.new(#3d4048, 70), color.new(#ffdd00, 15))
+
+// if vzo >= 40 and level_up >= 40 and level_down > 0
+if level_up >= 40 and level_down >= -10 and math.abs(level_up - level_down) <= 40
+    cloud_color := color.new(#ff3b3b, 10)
+    //vzo_color := color.new(#ff3b3b, 30)
+// else if vzo <= -40 and level_up <= 0 and level_down <= -40
+else if level_up <= 10 and level_down <= -40 and math.abs(level_up - level_down) <= 40
+    cloud_color:= color.new(#48ff3b, 10)
+    //vzo_color:= color.new(#48ff3b, 30)
+
+//plot(vzo, color = vzo_color, linewidth=2)    
+fill(p1, p2, color = cloud_color)
+//plot(range_lookback, color = color.yellow, linewidth=2)  
